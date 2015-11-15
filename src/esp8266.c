@@ -142,6 +142,13 @@ MotorControlData  lastDutyCycle[MOTOR_COUNT];
 
 /*==================[internal functions definition]==========================*/
 
+static inline void delayMS(uint16_t milliseconds){
+	volatile uint16_t i;
+	while (milliseconds--){
+		for (i = 0; i < (18360); i++);
+	}
+}
+
 /*==================[external functions definition]==========================*/
 /** \brief Main function
  *
@@ -232,12 +239,13 @@ TASK(InitTask)
 	encoder_init();
 
 	SetRelAlarm(ActivatePeriodicTask, 10, 5);
-	SetRelAlarm(ActivateSendStatusTask, 250, 1000);
+	//SetRelAlarm(ActivateSendStatusTask, 250, 1000);
 	ActivateTask(SerialEchoTask);
 
 	/* end InitTask */
 	TerminateTask();
 }
+
 
 uint32_t sendCommand(const char * command, uint8_t * buf, uint32_t size){
 	uint8_t len = ciaaPOSIX_strlen(command);
@@ -272,9 +280,8 @@ TASK(SerialEchoTask)
 {
 	int8_t buf[20];    // buffer for uart operation
 	int32_t ret;       // return value variable for posix calls
-	uint32_t i;
 
-	for (i = 0; i < 0xFFFFFF; i++);
+	delayMS(900);
 
 	sendCommand("AT+RST\r\n", buf2, 512);
 
@@ -308,7 +315,6 @@ TASK(SendStatusTask){
 	uint8_t send[] = "\r\n";
 	uint8_t connectionID = MAX_MULTIPLE_CONNECTIONS;
 	uint8_t i;
-	uint32_t j ;
 	int8_t * ptr = sendBuffer;
 
 	for (i = 0; i < MAX_MULTIPLE_CONNECTIONS; i++){
@@ -324,18 +330,17 @@ TASK(SendStatusTask){
 			encoder_data[7] = ':';
 			uintToString(encoder_getAverageRPM(i), 5, &(encoder_data[9]));
 			encoder_data[14] = ' ';
-			ptr = ciaaPOSIX_strcpy(ptr, (int8_t *)encoder_data);
+			ptr = (int8_t *)ciaaPOSIX_strcpy((char *)ptr, (char *)encoder_data);
 		}
 
 		uintToString(connectionID, 1, &(command[14]));
 		command[15] = ',';
-		uintToString(ciaaPOSIX_strlen(sendBuffer), 1, &(command[16]));
+		uintToString(ciaaPOSIX_strlen((char *)sendBuffer), 1, &(command[16]));
 
-		ciaaPOSIX_write(fd_uart2, command, ciaaPOSIX_strlen(command));
-		ciaaPOSIX_write(fd_uart2, send, ciaaPOSIX_strlen(send));
-		// Delay ??
-		for (j = 0; j < 0xFFFF; j++);
-		ciaaPOSIX_write(fd_uart2, sendBuffer, ciaaPOSIX_strlen(sendBuffer));
+		ciaaPOSIX_write(fd_uart2, command, ciaaPOSIX_strlen((char *)command));
+		ciaaPOSIX_write(fd_uart2, send, ciaaPOSIX_strlen((char *)send));
+		delayMS(3);
+		ciaaPOSIX_write(fd_uart2, sendBuffer, ciaaPOSIX_strlen((char *)sendBuffer));
 
 	}
 
