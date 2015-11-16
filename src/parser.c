@@ -23,6 +23,7 @@ extern void parser_initModule(void){
     parser_connectionOpenModule_init();
     parser_connectionCloseModule_init();
     parser_dutyCycleModule_init();
+    parser_connectionFailedModule_init();
 }
 
 extern int32_t parser_init(const Parser * parser){

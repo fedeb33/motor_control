@@ -10,6 +10,7 @@
 #define AVERAGE_WINDOW_SIZE		(10)
 #define SAMPLE_PERIOD			(100)
 #define ENCODER_COUNT			(2)
+#define SPEED_TYPE_RPM			(0)
 
 /*==================[typedef]================================================*/
 

@@ -83,7 +83,7 @@ uint32_t DWTStop (void)
 
 /*==================[internal functions declaration]=========================*/
 
-uint32_t sendCommand(const char * command, uint8_t * buf, uint32_t size);
+uint32_t sendCommand(const char * command, int8_t * buf, uint32_t size);
 
 /*==================[internal data definition]===============================*/
 /** \brief File descriptor for digital input ports
@@ -124,9 +124,12 @@ static const Parser parserConnectionOpen = {AT_MSG_CONNECTION_OPEN, &parserConne
 static PARSER_DATA_CONNECTIONCLOSE_T parserConnectionClose_data;
 static const Parser parserConnectionClose = {AT_MSG_CONNECTION_CLOSE, &parserConnectionClose_data};
 
+static PARSER_DATA_CONNECTIONFAILED_T parserConnectionFailed_data;
+static const Parser parserConnectionFailed = {AT_MSG_CONNECTION_FAILED, &parserConnectionFailed_data};
+
 static uint8_t connectionStatus[MAX_MULTIPLE_CONNECTIONS];
 
-uint8_t * buffer;
+int8_t * buffer;
 uint32_t length;
 uint32_t actualLength = 0;
 uint32_t activacionesSinLeer;
@@ -234,12 +237,13 @@ TASK(InitTask)
 
 	parser_init(&parserConnectionClose);
 	parser_init(&parserConnectionOpen);
+	parser_init(&parserConnectionFailed);
 	parser_init(&parserDutyCycle);
 
 	encoder_init();
 
 	SetRelAlarm(ActivatePeriodicTask, 10, 5);
-	//SetRelAlarm(ActivateSendStatusTask, 250, 1000);
+	SetRelAlarm(ActivateSendStatusTask, 250, 1000);
 	ActivateTask(SerialEchoTask);
 
 	/* end InitTask */
@@ -247,7 +251,7 @@ TASK(InitTask)
 }
 
 
-uint32_t sendCommand(const char * command, uint8_t * buf, uint32_t size){
+uint32_t sendCommand(const char * command, int8_t * buf, uint32_t size){
 	uint8_t len = ciaaPOSIX_strlen(command);
 
 	ciaaPOSIX_write(fd_uart2, command, len);
@@ -257,10 +261,10 @@ uint32_t sendCommand(const char * command, uint8_t * buf, uint32_t size){
 	length = size;
 	actualLength = 0;
 
-	while (ciaaPOSIX_strncmp(buf, command, len) != 0 && actualLength < len);
+	while (ciaaPOSIX_strncmp((char *)buf, command, len) != 0 && actualLength < len);
 
 	// Si no empieza con el comando tirar error...
-	if (ciaaPOSIX_strncmp(buf, command, len) != 0){
+	if (ciaaPOSIX_strncmp((char *)buf, (char *)command, len) != 0){
 		//return 0;
 	}
 
@@ -311,11 +315,12 @@ static int8_t sendBuffer[SEND_BUFFER_SIZE];
 
 TASK(SendStatusTask){
 	uint8_t command[] = "AT+CIPSENDBUF=A,BBB";
-	uint8_t encoder_data[] = "Motor X: 12345 RPM\r\n";
+	uint8_t encoder_data[] = "$SPEEDXTVALOR$";
 	uint8_t send[] = "\r\n";
 	uint8_t connectionID = MAX_MULTIPLE_CONNECTIONS;
 	uint8_t i;
 	int8_t * ptr = sendBuffer;
+	uint8_t * ptr2;
 
 	for (i = 0; i < MAX_MULTIPLE_CONNECTIONS; i++){
 		if (connectionStatus[i] == CONNECTION_STATUS_OPEN){
@@ -326,10 +331,11 @@ TASK(SendStatusTask){
 
 	if (connectionID < MAX_MULTIPLE_CONNECTIONS){
 		for (i = 0; i < ENCODER_COUNT; i++){
-			uintToString(i, 1, &(encoder_data[6]));
-			encoder_data[7] = ':';
-			uintToString(encoder_getAverageRPM(i), 5, &(encoder_data[9]));
-			encoder_data[14] = ' ';
+			ptr2 = uintToString(i, 1, &(encoder_data[6]));
+			*ptr2 = '0' + SPEED_TYPE_RPM;
+			ptr2 = uintToString(encoder_getAverageRPM(i), 4, &(encoder_data[8]));
+			*ptr2++ = '$';
+			*ptr2 = '\0';
 			ptr = (int8_t *)ciaaPOSIX_strcpy((char *)ptr, (char *)encoder_data);
 		}
 
@@ -382,6 +388,10 @@ TASK(PeriodicTask)
 
 				if (parser_tryMatch(&parserConnectionClose, buf[i]) == STATUS_COMPLETE){
 					connectionStatus[parserConnectionClose_data.results.connectionID] = CONNECTION_STATUS_CLOSE;
+				}
+
+				if (parser_tryMatch(&parserConnectionFailed, buf[i]) == STATUS_COMPLETE){
+					connectionStatus[parserConnectionFailed_data.results.connectionID] = CONNECTION_STATUS_CLOSE;
 				}
 
 				ret1 = parser_tryMatch(&parserIPD, buf[i]);

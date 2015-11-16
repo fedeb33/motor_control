@@ -26,6 +26,7 @@ typedef enum {
     AT_MSG_IPD = 0,
     AT_MSG_CONNECTION_OPEN,
     AT_MSG_CONNECTION_CLOSE,
+	AT_MSG_CONNECTION_FAILED,
     USER_DUTYCYCLE,
     PARSER_TYPES_COUNT
 } ParserType;
@@ -48,6 +49,7 @@ typedef struct {
 #include "at_cmd/ipd.h"
 #include "at_cmd/connection_open.h"
 #include "at_cmd/connection_close.h"
+#include "at_cmd/connection_failed.h"
 #include "user_cmd/dutycycle.h"
 
 /*==================[external data declaration]==============================*/
