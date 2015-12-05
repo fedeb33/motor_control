@@ -28,6 +28,7 @@ typedef enum {
     AT_MSG_CONNECTION_CLOSE,
 	AT_MSG_CONNECTION_FAILED,
     USER_DUTYCYCLE,
+    LITERAL_PARSER,
     PARSER_TYPES_COUNT
 } ParserType;
 
@@ -50,6 +51,7 @@ typedef struct {
 #include "at_cmd/connection_open.h"
 #include "at_cmd/connection_close.h"
 #include "at_cmd/connection_failed.h"
+#include "at_cmd/literal_parser.h"
 #include "user_cmd/dutycycle.h"
 
 /*==================[external data declaration]==============================*/

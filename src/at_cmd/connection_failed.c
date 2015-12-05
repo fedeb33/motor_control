@@ -77,10 +77,22 @@ static void tryMatch_internal(PARSER_INTERNALDATA_T * internalData,
         	break;
     }
 
-    if (ret == STATUS_NOT_MATCHES || ret == STATUS_COMPLETE){
-        internalData->state = S0;
-        internalData->readPos = 0;
-    }
+	if (ret == STATUS_COMPLETE){
+		internalData->readPos = 0;
+		internalData->state = S0;
+	}
+
+	if (ret == STATUS_NOT_MATCHES)
+	{
+		internalData->readPos = 0;
+		if (internalData->state != S0)
+		{
+			internalData->state = S0;
+			tryMatch_internal(internalData, results, newChar);
+			/* El estado final del parser es determinado por la llamada recursiva */
+			ret = internalData->parserState;
+		}
+	}
 
     internalData->parserState = ret;
 }

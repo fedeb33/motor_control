@@ -1,78 +1,98 @@
-/* Copyright 2014, Mariano Cerdeiro
- * Copyright 2014, Pablo Ridolfi
- * Copyright 2014, Juan Cecconi
- * Copyright 2014, Gustavo Muro
- *
- * This file is part of CIAA Firmware.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *
- * 1. Redistributions of source code must retain the above copyright notice,
- *    this list of conditions and the following disclaimer.
- *
- * 2. Redistributions in binary form must reproduce the above copyright notice,
- *    this list of conditions and the following disclaimer in the documentation
- *    and/or other materials provided with the distribution.
- *
- * 3. Neither the name of the copyright holder nor the names of its
- *    contributors may be used to endorse or promote products derived from this
- *    software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
- *
- */
-
-#ifndef _ESP8266_H_
-#define _ESP8266_H_
-/** \brief Blinking example header file
- **
- ** This is a mini example of the CIAA Firmware
- **
- **/
-
-/** \addtogroup CIAA_Firmware CIAA Firmware
- ** @{ */
-/** \addtogroup Examples CIAA Firmware Examples
- ** @{ */
-/** \addtogroup Blinking Blinking example header file
- ** @{ */
-
-/*
- * Initials     Name
- * ---------------------------
- *
- */
-
-/*
- * modification history (new versions first)
- * -----------------------------------------------------------
- * yyyymmdd v0.0.1 initials initial version
- */
+#ifndef ESP8266_H_
+#define ESP8266_H_
 
 /*==================[inclusions]=============================================*/
 
 /*==================[macros]=================================================*/
 
+#define AT_CIPSEND_CONTENT_DONT_COPY        (0)
+#define AT_CIPSEND_CONTENT_COPYTOBUFFER     (1)
+
+#define ENABLE12 	0x0040		// 00000000 01000000
+#define ENABLE34    0x0080		// 00000000 10000000
+#define ESP8266_EN	0x0100		// 00000010	00000000
+#define ESP8266_RST 0x0200		// 00000100	00000000
+
 /*==================[typedef]================================================*/
+
+typedef enum {
+	AT_RST = 0,
+	AT_CWMODE,
+	AT_CWSAP,
+	AT_CWSAP_CUR,
+	AT_CWSAP_DEF,
+	AT_CIPMUX,
+	AT_CIPSERVER,
+	AT_CIPSEND,
+	AT_CIPSENDEX,
+	AT_CIPSENDBUF,
+	AT_COMMAND_SIZE
+} AT_Command;
+
+
+typedef enum {
+    AT_TYPE_TEST    = 1 << 0,
+    AT_TYPE_QUERY   = 1 << 1,
+    AT_TYPE_SET     = 1 << 2,
+    AT_TYPE_EXECUTE = 1 << 3
+} AT_Type;
+
+
+typedef enum {
+    AT_CWMODE_MODE_MIN        = 1,
+    AT_CWMODE_STATION         = 1,
+    AT_CWMODE_SOFTAP          = 2,
+    AT_CWMODE_SOFTAP_STATION  = 3,
+    AT_CWMODE_MODE_MAX        = 3
+} AT_CWMODE_MODE;
+
+
+typedef enum {
+    AT_SAP_ENCRYPTION_OPEN          = 0,
+    AT_SAP_ENCRYPTION_WPA_PSK       = 2,
+    AT_SAP_ENCRYPTION_WPA2_PSK      = 3,
+    AT_SAP_ENCRYPTION_WPA_WPA2_PSK  = 4
+} AT_SAP_ENCRYPTION;
+
+
+typedef struct {
+    char *      content;
+    uint16_t    length;
+    uint8_t     copyContentToBuffer; /* 1: se copia content a buffer interno, 0: no se lo copia, usar en caso de que content se encuentre en flash */
+    uint8_t     connectionID;
+} AT_CIPSEND_DATA;
+
+
+typedef enum {
+    AT_CIPMUX_SINGLE_CONNECTION     = 0,
+    AT_CIPMUX_MULTIPLE_CONNECTION   = 1
+} AT_CIPMUX_MODE;
+
+
+typedef enum {
+    AT_CIPSERVER_DELETE = 0,
+    AT_CIPSERVER_CREATE
+} AT_CIPSERVER_MODE;
+
+
+typedef struct {
+    AT_CIPSERVER_MODE   mode;
+    uint16_t            port;
+} AT_CIPSERVER_DATA;
+
+
+typedef struct {
+    char *              ssid;
+    char *              pwd;
+    uint8_t             chl;
+    AT_SAP_ENCRYPTION   ecn;
+} AT_CWSAP_DATA;
 
 /*==================[external data declaration]==============================*/
 
 /*==================[external functions declaration]=========================*/
 
-/** @} doxygen end group definition */
-/** @} doxygen end group definition */
-/** @} doxygen end group definition */
-/*==================[end of file]============================================*/
-#endif /* #ifndef _ESP8266_H_ */
+int32_t esp8266_queueCommand(AT_Command command, AT_Type type, void* parameters);
 
+
+#endif // ESP8266_H_

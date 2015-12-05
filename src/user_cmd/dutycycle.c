@@ -95,8 +95,10 @@ static void tryMatch_internal(	PARSER_INTERNALDATA_T * internalData,
 				internalData->dataLength--;
 				if (internalData->dataLength == 0){
 
-					if (parseReceivedDutyCycle(results))
+					if (parseReceivedDutyCycle(results)){
 						ret = STATUS_COMPLETE;
+						internalData->state = S0;
+					}
 					else
 						ret = STATUS_NOT_MATCHES;
 
@@ -109,8 +111,10 @@ static void tryMatch_internal(	PARSER_INTERNALDATA_T * internalData,
 			break;
 	}
 
-	if (ret == STATUS_NOT_MATCHES || ret == STATUS_COMPLETE){
+	if (ret == STATUS_NOT_MATCHES && internalData->state != S0){
 		internalData->state = S0;
+		tryMatch_internal(internalData, results, newChar);
+		ret = internalData->parserState;
 	}
 
     internalData->parserState = ret;

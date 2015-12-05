@@ -42,5 +42,6 @@ typedef struct {
 /*==================[external functions declaration]=========================*/
 
 extern void parser_ipdModule_init(void);
+extern uint8_t parser_ipd_isDataBeingSaved(void* parserData);
 
 #endif // _IPD_H_

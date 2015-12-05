@@ -109,10 +109,24 @@ static void tryMatch_internal(PARSER_INTERNALDATA_T * internalData, PARSER_RESUL
 		break;
 	}
 
-	if (ret == STATUS_NOT_MATCHES || ret == STATUS_COMPLETE){
-		internalData->state = S0;
+
+	if (ret == STATUS_NOT_MATCHES)
+	{
 		internalData->readPos = 0;
 		internalData->writePos = 0;
+
+		if (internalData->state != S0)
+		{
+			internalData->state = S0;
+			tryMatch_internal(internalData, results, newChar);
+			/* El estado final del parser es determinado por la llamada recursiva */
+			ret = internalData->parserState;
+		}
+	}
+	else if (ret == STATUS_COMPLETE){
+		internalData->readPos = 0;
+		internalData->writePos = 0;
+		internalData->state = S0;
 	}
 
 	internalData->parserState = ret;
@@ -126,4 +140,11 @@ static void* getResults(void* parserData){
 
 extern void parser_ipdModule_init(void){
 	parser_add(&parserDef);
+}
+
+
+extern uint8_t parser_ipd_isDataBeingSaved(void* parserData)
+{
+	PARSER_DATA_T * p = parserData;
+	return ((p->internalData.parserState == STATUS_INCOMPLETE) && (p->internalData.state == S4));
 }
