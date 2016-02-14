@@ -1,17 +1,18 @@
-#ifndef ESP8266_H_
-#define ESP8266_H_
+#ifndef ESP8266_H
+#define ESP8266_H
 
 /*==================[inclusions]=============================================*/
 
+#include "parser.h"
+
 /*==================[macros]=================================================*/
+
+#define MAX_MULTIPLE_CONNECTIONS	(5)
 
 #define AT_CIPSEND_CONTENT_DONT_COPY        (0)
 #define AT_CIPSEND_CONTENT_COPYTOBUFFER     (1)
 
-#define ENABLE12 	0x0040		// 00000000 01000000
-#define ENABLE34    0x0080		// 00000000 10000000
-#define ESP8266_EN	0x0100		// 00000010	00000000
-#define ESP8266_RST 0x0200		// 00000100	00000000
+#define AT_CIPSEND_ZERO_TERMINATED_CONTENT  (0)
 
 /*==================[typedef]================================================*/
 
@@ -88,11 +89,45 @@ typedef struct {
     AT_SAP_ENCRYPTION   ecn;
 } AT_CWSAP_DATA;
 
+typedef void (*callbackCommandSentFunction_type)(AT_Command cmd);
+
+typedef PARSER_RESULTS_IPD_T ReceivedDataInfo;
+typedef void (*callbackDataReceivedFunction_type)(ReceivedDataInfo info);
+
+
+typedef enum
+{
+    CONNECTION_STATUS_CLOSE = 0,
+    CONNECTION_STATUS_OPEN = 1
+} ConnectionStatus;
+
+typedef struct
+{
+    ConnectionStatus newStatus;
+    uint8_t connectionID;
+} ConnectionInfo;
+
+typedef void (*callbackConnectionChangedFunction_type)(ConnectionInfo info);
+
+typedef void (*callbackResetDetectedFunction_type)(void);
+
 /*==================[external data declaration]==============================*/
 
 /*==================[external functions declaration]=========================*/
 
-int32_t esp8266_queueCommand(AT_Command command, AT_Type type, void* parameters);
+extern int32_t esp8266_queueCommand(AT_Command command, AT_Type type, void* parameters);
 
+extern void esp8266_registerCommandSentCallback(callbackCommandSentFunction_type fcn);
+extern void esp8266_registerDataReceivedCallback(callbackDataReceivedFunction_type fcn);
+extern void esp8266_registerConnectionChangedCallback(callbackConnectionChangedFunction_type fcn);
+extern void esp8266_registerResetDetectedCallback(callbackResetDetectedFunction_type fcn);
 
-#endif // ESP8266_H_
+extern void esp8266_doWork(void);
+extern void esp8266_init(void);
+extern void esp8266_setReceiveBuffer(uint8_t * buf, uint16_t size);
+
+extern ssize_t esp8266_writeRawData(void * buf, size_t size);
+
+extern ConnectionStatus esp8266_getConnectionStatus(uint8_t connectionID);
+
+#endif // ESP8266_H

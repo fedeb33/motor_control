@@ -7,22 +7,22 @@
 
 /*==================[macros]=================================================*/
 
-#undef PARSER_NAME
-#define PARSER_NAME             IPD
-#define PARSER_INTERNALDATA_T   PARSER_INTERNALDATA_TYPE(PARSER_NAME)
-#define PARSER_RESULTS_T        PARSER_RESULTS_TYPE(PARSER_NAME)
-#define PARSER_DATA_T           PARSER_DATA_TYPE(PARSER_NAME)
-#define PARSER_DATA_IPD_T       PARSER_DATA_TYPE(IPD)
-#define PARSER_RESULTS_IPD_T    PARSER_RESULTS_TYPE(IPD)
+#undef PARSER_DATA_T
+#undef PARSER_RESULTS_T
+
+#define PARSER_DATA_T					PARSER_DATA_TYPE(IPD)
+#define PARSER_RESULTS_T                PARSER_RESULTS_TYPE(IPD)
+#define PARSER_RESULTS_IPD_T			PARSER_RESULTS_TYPE(IPD)
+
+#define INITIALIZER_AT_IPD {AT_MSG_IPD, STATUS_UNINITIALIZED, 0, 0, &FUNCTIONS_AT_IPD}
 
 /*==================[typedef]================================================*/
 
 typedef struct {
-    ParserStatus    parserState;
     fsmStatus       state;
     uint16_t        readPos;
     uint16_t        writePos;
-} PARSER_INTERNALDATA_T;
+} PARSER_DATA_T;
 
 typedef struct {
     uint8_t *   buffer;
@@ -31,17 +31,13 @@ typedef struct {
     uint8_t     connectionID;
 } PARSER_RESULTS_T;
 
-
-typedef struct {
-    PARSER_INTERNALDATA_T   internalData;
-    PARSER_RESULTS_T        results;
-} PARSER_DATA_T;
-
 /*==================[external data declaration]==============================*/
+
+extern const ParserFunctions FUNCTIONS_AT_IPD;
 
 /*==================[external functions declaration]=========================*/
 
-extern void parser_ipdModule_init(void);
-extern uint8_t parser_ipd_isDataBeingSaved(void* parserData);
+extern uint8_t parser_ipd_isDataBeingSaved(Parser* parserPtr);
+extern void parser_ipd_setBuffer(Parser* parserPtr, uint8_t * buf, uint16_t sz);
 
 #endif // _IPD_H_

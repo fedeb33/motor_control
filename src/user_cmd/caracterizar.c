@@ -1,6 +1,6 @@
 /*==================[inclusions]=============================================*/
 
-#include "ipd.h"
+#include "caracterizar.h"
 #include "../parser_helper.h"
 
 /*==================[macros and definitions]=================================*/
@@ -19,7 +19,7 @@ static ParserStatus tryMatch_internal(	PARSER_DATA_T * internalData,
 
 /*==================[external data definition]===============================*/
 
-const ParserFunctions FUNCTIONS_AT_IPD =
+const ParserFunctions FUNCTIONS_USER_CARACTERIZAR =
 {
     &init,
     &tryMatch,
@@ -41,7 +41,6 @@ static void init(Parser* parserPtr)
     p = parserPtr->data;
     p->state = S0;
 	p->readPos = 0;
-	p->writePos = 0;
 
     parserPtr->status = STATUS_INITIALIZED;
 }
@@ -65,57 +64,41 @@ static ParserStatus tryMatch_internal(PARSER_DATA_T * internalData,
 
 	switch(internalData->state){
 	case S0: /* Leer caracteres que comienzan en el mensaje */
-		if (newChar == "+IPD,"[internalData->readPos]){
+		if (newChar == "$CARACTERIZAR="[internalData->readPos])
+		{
 			internalData->readPos++;
 			ret = STATUS_INCOMPLETE;
-			if ("+IPD,"[internalData->readPos] == '\0'){
-				internalData->state = S1; /* TODO Si CIPMUX es 0, saltar a S3 */
+			if ("$CARACTERIZAR="[internalData->readPos] == '\0')
+			{
+				internalData->state = S1;
 			}
 		}
 		break;
-	case S1: /* Matcheo de ID de conexión, de 0 a 4 */
-		if (newChar >= '0' && newChar <= '4'){
-			results->connectionID = newChar - '0';
+	case S1: /* Leo el ID del motor, un sólo carácter */
+		if (newChar >= '0' && newChar <= '9')
+		{
+			results->idMotor = newChar - '0';
 			internalData->state = S2;
 			ret = STATUS_INCOMPLETE;
 		}
 		break;
-	case S2: /* Matcheo de ',' que sucede al ID de conexión */
-		if (newChar == ','){
+	case S2: /* Matcheo de ',' que sucede al ID del motor */
+		if (newChar == ',')
+		{
 			internalData->state = S3;
-			results->payloadLength = 0;
+			results->tiempo = 0;
 			ret = STATUS_INCOMPLETE;
 		}
 		break;
-	case S3: /* Matcheo de longitud del mensaje (payload) */
-		if (newChar == ':' && results->payloadLength > 0){
-			internalData->state = S4;
-			ret = STATUS_INCOMPLETE;
-		}
-		else if (newChar >= '0' && newChar <= '9'){
-			results->payloadLength = (results->payloadLength * 10) + (newChar - '0');
-			ret = STATUS_INCOMPLETE;
-		}
-		break;
-	case S4: /* Lectura del payload */
-		/* Escribe sólo si hay lugar en el buffer. */
-		/* Si se llena, se continua leyendo caracteres, sin almacenarlos, hasta leer
-		 * la cantidad especificada por la longitud del mensaje (payloadLength).
-		 * El usuario debe comprobar si el buffer tuvo suficiente espacio para
-		 * guardar todo el mensaje.
-		 */
-		if (internalData->writePos < results->bufferLength){
-			results->buffer[internalData->writePos] = newChar;
-		}
-
-		internalData->writePos++;
-		if (results->payloadLength == internalData->writePos){
+	case S3: /* Matcheo del parámetro TIEMPO */
+		if (newChar == '$' && results->tiempo > 0)
+		{
 			ret = STATUS_COMPLETE;
 		}
-		else{
+		else if (newChar >= '0' && newChar <= '9'){
+			results->tiempo = (results->tiempo * 10) + (newChar - '0');
 			ret = STATUS_INCOMPLETE;
 		}
-
 		break;
 	default:
 		break;
@@ -125,7 +108,6 @@ static ParserStatus tryMatch_internal(PARSER_DATA_T * internalData,
 	if (ret == STATUS_NOT_MATCHES || ret == STATUS_COMPLETE){
 		internalData->state = S0;
 		internalData->readPos = 0;
-		internalData->writePos = 0;
 	}
 
 	return ret;
@@ -133,14 +115,3 @@ static ParserStatus tryMatch_internal(PARSER_DATA_T * internalData,
 
 /*==================[external functions definition]==========================*/
 
-extern uint8_t parser_ipd_isDataBeingSaved(Parser* parserPtr)
-{
-	return ((parserPtr->status == STATUS_INCOMPLETE) && (((PARSER_DATA_T*)parserPtr->data)->state == S4));
-}
-
-
-extern void parser_ipd_setBuffer(Parser* parserPtr, uint8_t * buf, uint16_t sz)
-{
-	((PARSER_RESULTS_T*)parserPtr->results)->bufferLength = sz;
-    ((PARSER_RESULTS_T*)parserPtr->results)->buffer = buf;
-}

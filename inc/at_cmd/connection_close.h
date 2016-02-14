@@ -7,36 +7,30 @@
 
 /*==================[macros]=================================================*/
 
-#undef PARSER_NAME
-#define PARSER_NAME              connectionClose
-#define PARSER_INTERNALDATA_T    PARSER_INTERNALDATA_TYPE(PARSER_NAME)
-#define PARSER_RESULTS_T         PARSER_RESULTS_TYPE(PARSER_NAME)
-#define PARSER_DATA_T            PARSER_DATA_TYPE(PARSER_NAME)
-#define PARSER_DATA_CONNECTIONCLOSE_T       PARSER_DATA_TYPE(connectionClose)
+#undef PARSER_DATA_T
+#undef PARSER_RESULTS_T
+
+#define PARSER_DATA_T                       PARSER_DATA_TYPE(connectionClose)
+#define PARSER_RESULTS_T                    PARSER_RESULTS_TYPE(connectionClose)
 #define PARSER_RESULTS_CONNECTIONCLOSE_T    PARSER_RESULTS_TYPE(connectionClose)
+
+#define INITIALIZER_AT_CONNECTIONCLOSE {AT_MSG_CONNECTION_CLOSE, STATUS_UNINITIALIZED, 0, 0, &FUNCTIONS_AT_CONNECTIONCLOSE}
 
 /*==================[typedef]================================================*/
 
 typedef struct {
-    ParserStatus    parserState;
     fsmStatus       state;
     uint8_t         readPos;
-} PARSER_INTERNALDATA_T;
+} PARSER_DATA_T;
 
 typedef struct {
     uint8_t connectionID;
 } PARSER_RESULTS_T;
 
-
-typedef struct {
-    PARSER_INTERNALDATA_T  internalData;
-    PARSER_RESULTS_T       results;
-} PARSER_DATA_T;
-
 /*==================[external data declaration]==============================*/
 
-/*==================[external functions declaration]=========================*/
+extern const ParserFunctions FUNCTIONS_AT_CONNECTIONCLOSE;
 
-extern void parser_connectionCloseModule_init(void);
+/*==================[external functions declaration]=========================*/
 
 #endif // _CONNECTION_CLOSE_H_

@@ -1,5 +1,5 @@
-#ifndef _CONNECTION_OPEN_H_
-#define _CONNECTION_OPEN_H_
+#ifndef _CARACTERIZAR_H_
+#define _CARACTERIZAR_H_
 
 /*==================[inclusions]=============================================*/
 
@@ -10,27 +10,29 @@
 #undef PARSER_DATA_T
 #undef PARSER_RESULTS_T
 
-#define PARSER_DATA_T                       PARSER_DATA_TYPE(connectionOpen)
-#define PARSER_RESULTS_T                    PARSER_RESULTS_TYPE(connectionOpen)
-#define PARSER_RESULTS_CONNECTIONOPEN_T     PARSER_RESULTS_TYPE(connectionOpen)
+#define PARSER_DATA_T					PARSER_DATA_TYPE(caracterizar)
+#define PARSER_RESULTS_T                PARSER_RESULTS_TYPE(caracterizar)
+#define PARSER_RESULTS_CARACTERIZAR_T	PARSER_RESULTS_TYPE(caracterizar)
 
-#define INITIALIZER_AT_CONNECTIONOPEN {AT_MSG_CONNECTION_OPEN, STATUS_UNINITIALIZED, 0, 0, &FUNCTIONS_AT_CONNECTIONOPEN}
+#define INITIALIZER_CARACTERIZAR {USER_CARACTERIZAR, STATUS_UNINITIALIZED, 0, 0, &FUNCTIONS_USER_CARACTERIZAR}
 
 /*==================[typedef]================================================*/
 
 typedef struct {
     fsmStatus       state;
-    uint8_t         readPos;
+    uint16_t        readPos;
 } PARSER_DATA_T;
 
 typedef struct {
-    uint8_t connectionID;
+    uint16_t    tiempo;
+    uint8_t     idMotor;
 } PARSER_RESULTS_T;
 
 /*==================[external data declaration]==============================*/
 
-extern const ParserFunctions FUNCTIONS_AT_CONNECTIONOPEN;
+extern const ParserFunctions FUNCTIONS_USER_CARACTERIZAR;
 
 /*==================[external functions declaration]=========================*/
 
-#endif // _CONNECTION_OPEN_H_
+
+#endif // _CARACTERIZAR_H_

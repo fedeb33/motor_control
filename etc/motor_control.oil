@@ -67,7 +67,7 @@ TASK InitTask {
     EVENT = POSIXE;
 }
 
-TASK SerialEchoTask {
+TASK BackgroundTask {
     PRIORITY = 5;
     ACTIVATION = 1;
     STACK = 512;
@@ -77,10 +77,10 @@ TASK SerialEchoTask {
     RESOURCE = POSIXR;
 }
 
-TASK PeriodicTask {
+TASK WiFiDataReceiveTask {
     PRIORITY = 10;
     ACTIVATION = 1;
-    STACK = 512;
+    STACK = 1024;
     TYPE = BASIC;
     SCHEDULE = FULL;
     RESOURCE = POSIXR;
@@ -95,19 +95,10 @@ TASK EncoderTask {
     RESOURCE = POSIXR;
 }
 
-TASK SendStatusTask {
-    PRIORITY = 15;
-    ACTIVATION = 1;
-    STACK = 1024;
-    TYPE = BASIC;
-    SCHEDULE = FULL;
-    RESOURCE = POSIXR;
-}
-
-ALARM ActivatePeriodicTask {
+ALARM ActivateWiFiDataReceiveTask {
     COUNTER = SoftwareCounter;
     ACTION = ACTIVATETASK {
-        TASK = PeriodicTask;
+        TASK = WiFiDataReceiveTask;
     }
 }
 
@@ -115,13 +106,6 @@ ALARM ActivateEncoderTask {
     COUNTER = SoftwareCounter;
     ACTION = ACTIVATETASK {
         TASK = EncoderTask;
-    }
-}
-
-ALARM ActivateSendStatusTask {
-    COUNTER = SoftwareCounter;
-    ACTION = ACTIVATETASK {
-        TASK = SendStatusTask;
     }
 }
 
@@ -140,7 +124,7 @@ COUNTER HardwareCounter {
 };
 
 COUNTER SoftwareCounter {
-   MAXALLOWEDVALUE = 1000;
+   MAXALLOWEDVALUE = 10000;
    TICKSPERBASE = 1;
    MINCYCLE = 1;
    TYPE = SOFTWARE;

@@ -1,6 +1,7 @@
 /*==================[inclusions]=============================================*/
 
 #include "dutycycle.h"
+#include "../parser_helper.h"
 
 /*==================[macros and definitions]=================================*/
 
@@ -8,49 +9,57 @@
 
 /*==================[internal functions declaration]=========================*/
 
-static void init(void* parserData);
-static ParserStatus getStatus(void* parserData);
-static void tryMatch(void* parserData, uint8_t newChar);
-static void tryMatch_internal(	PARSER_INTERNALDATA_T * internalData,
+static void init(Parser* parserPtr);
+static ParserStatus tryMatch(Parser* parserPtr, uint8_t newChar);
+static ParserStatus tryMatch_internal(	PARSER_DATA_T * internalData,
 								PARSER_RESULTS_T * results,
 								uint8_t newChar);
-static void* getResults(void* parserData);
 static uint8_t parseReceivedDutyCycle(PARSER_RESULTS_T * results);
 
 /*==================[internal data definition]===============================*/
 
-static const ParserDefinition parserDef =
+/*==================[external data definition]===============================*/
+
+const ParserFunctions FUNCTIONS_DUTYCYCLE =
 {
     &init,
-    &getStatus,
     &tryMatch,
-    &getResults,
-    USER_DUTYCYCLE
+    &parser_default_deinit
 };
-
-/*==================[external data definition]===============================*/
 
 /*==================[internal functions definition]==========================*/
 
-static void init(void* parserData){
-    PARSER_DATA_T * p = parserData;
-    p->internalData.state = S0;
-    p->internalData.dataLength = 0;
-    p->internalData.parserState = STATUS_INITIALIZED;
+static void init(Parser* parserPtr)
+{
+    PARSER_DATA_T * p;
+
+    if (parserPtr->data == 0)
+        parserPtr->data = (void*) malloc(sizeof(PARSER_DATA_T));
+
+    if (parserPtr->results == 0)
+        parserPtr->results = (void*) malloc(sizeof(PARSER_RESULTS_T));
+
+    p = parserPtr->data;
+    p->state = S0;
+    p->dataLength = 0;
+
+    parserPtr->status = STATUS_INITIALIZED;
 }
 
-static ParserStatus getStatus(void* parserData){
-    return (((PARSER_DATA_T*)parserData)->internalData.parserState);
+
+static ParserStatus tryMatch(Parser* parserPtr, uint8_t newChar){
+    parserPtr->status = tryMatch_internal(parserPtr->data, parserPtr->results, newChar);
+    if (parserPtr->status == STATUS_NOT_MATCHES)
+    {
+        parserPtr->status = tryMatch_internal(parserPtr->data, parserPtr->results, newChar);
+    }
+    return parserPtr->status;
 }
 
-static void tryMatch(void* parserData, uint8_t newChar){
-    PARSER_DATA_T * p = parserData;
-    tryMatch_internal(&(p->internalData), &(p->results), newChar);
-}
-
-static void tryMatch_internal(	PARSER_INTERNALDATA_T * internalData,
-								PARSER_RESULTS_T * results, uint8_t newChar){
-
+static ParserStatus tryMatch_internal(PARSER_DATA_T * internalData,
+                                      PARSER_RESULTS_T * results,
+                                      uint8_t newChar)
+{
 	ParserStatus ret = STATUS_NOT_MATCHES;
 
 	switch(internalData->state){
@@ -111,13 +120,12 @@ static void tryMatch_internal(	PARSER_INTERNALDATA_T * internalData,
 			break;
 	}
 
-	if (ret == STATUS_NOT_MATCHES && internalData->state != S0){
+	if (ret == STATUS_NOT_MATCHES || ret == STATUS_COMPLETE)
+    {
 		internalData->state = S0;
-		tryMatch_internal(internalData, results, newChar);
-		ret = internalData->parserState;
 	}
 
-    internalData->parserState = ret;
+    return ret;
 }
 
 static uint8_t parseReceivedDutyCycle(PARSER_RESULTS_T * results){
@@ -137,12 +145,4 @@ static uint8_t parseReceivedDutyCycle(PARSER_RESULTS_T * results){
 	return 0;
 }
 
-static void* getResults(void* parserData){
-    return &(((PARSER_DATA_T*)parserData)->results);
-}
-
 /*==================[external functions definition]==========================*/
-
-extern void parser_dutyCycleModule_init(void){
-    parser_add(&parserDef);
-}

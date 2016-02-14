@@ -1,5 +1,5 @@
-#ifndef _CONNECTION_OPEN_H_
-#define _CONNECTION_OPEN_H_
+#ifndef _RESET_DETECTION_H_
+#define _RESET_DETECTION_H_
 
 /*==================[inclusions]=============================================*/
 
@@ -10,27 +10,28 @@
 #undef PARSER_DATA_T
 #undef PARSER_RESULTS_T
 
-#define PARSER_DATA_T                       PARSER_DATA_TYPE(connectionOpen)
-#define PARSER_RESULTS_T                    PARSER_RESULTS_TYPE(connectionOpen)
-#define PARSER_RESULTS_CONNECTIONOPEN_T     PARSER_RESULTS_TYPE(connectionOpen)
+#define PARSER_DATA_T                       PARSER_DATA_TYPE(resetDetection)
+#define PARSER_RESULTS_T                    PARSER_RESULTS_TYPE(resetDetection)
+#define PARSER_RESULTS_RESET_DETECTION_T    PARSER_RESULTS_TYPE(resetDetection)
 
-#define INITIALIZER_AT_CONNECTIONOPEN {AT_MSG_CONNECTION_OPEN, STATUS_UNINITIALIZED, 0, 0, &FUNCTIONS_AT_CONNECTIONOPEN}
+#define INITIALIZER_AT_RESET_DETECTION {AT_MSG_RESET, STATUS_UNINITIALIZED, 0, 0, &FUNCTIONS_AT_RESET_DETECTION}
 
 /*==================[typedef]================================================*/
 
 typedef struct {
     fsmStatus       state;
-    uint8_t         readPos;
+    Parser          strParser;
+    uint16_t        skippedChars;
 } PARSER_DATA_T;
 
 typedef struct {
-    uint8_t connectionID;
+    uint8_t dummy;
 } PARSER_RESULTS_T;
 
 /*==================[external data declaration]==============================*/
 
-extern const ParserFunctions FUNCTIONS_AT_CONNECTIONOPEN;
+extern const ParserFunctions FUNCTIONS_AT_RESET_DETECTION;
 
 /*==================[external functions declaration]=========================*/
 
-#endif // _CONNECTION_OPEN_H_
+#endif // _RESET_DETECTION_H_
