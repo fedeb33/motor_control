@@ -9,6 +9,7 @@
 #include "StringUtils.h"
 #include "debug_logger.h"
 #include "ciaaLibs_CircBufExt.h"
+#include "timer.h"
 
 /*==================[macros and definitions]=================================*/
 
@@ -40,9 +41,9 @@ typedef struct {
 } ExternalBufferedDataInfo;
 
 typedef enum {
-    CONTENT_EMPTY = 0,
-    CONTENT_INTERNAL = 1,
-    CONTENT_EXTERNAL = 2
+	CONTENT_EMPTY = 0,
+	CONTENT_INTERNAL = 1,
+	CONTENT_EXTERNAL = 2
 } ContentType;
 
 typedef struct {
@@ -60,10 +61,10 @@ typedef int32_t (*paramsToString_type)(QueuedCommand* commandData, void* paramet
 
 typedef enum
 {
-    WAIT_RESULT_TIMEOUT	= -1,
-    WAIT_RESULT_BUSY = 0,
-    WAIT_RESULT_OK = 1,
-    WAIT_RESULT_ERROR = 2
+	WAIT_RESULT_TIMEOUT	= -1,
+	WAIT_RESULT_BUSY = 0,
+	WAIT_RESULT_OK = 1,
+	WAIT_RESULT_ERROR = 2
 } WaitResult;
 
 typedef WaitResult (*waitFunction_type)(void);
@@ -207,13 +208,6 @@ static ConnectionStatus connectionStatus[MAX_MULTIPLE_CONNECTIONS];
 
 /*==================[internal functions definition]==========================*/
 
-static inline void delayMS(uint16_t milliseconds){
-	volatile uint16_t i;
-	while (milliseconds--){
-		for (i = 0; i < (18360); i++);
-	}
-}
-
 static inline const char * AT_Type_toString(const AT_Type type){
 	switch(type){
 	case AT_TYPE_TEST:
@@ -232,13 +226,13 @@ static inline const char * AT_Type_toString(const AT_Type type){
 
 static inline void deleteCommandDataFromBuffer(QueuedCommand* cmd)
 {
-    /* Elimino el comando del buffer, el contenido (si está presente) también */
-    internalBuffer_deleteFrontData(cmd->paramsData);
+	/* Elimino el comando del buffer, el contenido (si está presente) también */
+	internalBuffer_deleteFrontData(cmd->paramsData);
 
-    if (cmd->contentInfo == CONTENT_INTERNAL)
-    {
-        internalBuffer_deleteFrontData(cmd->content.internal);
-    }
+	if (cmd->contentInfo == CONTENT_INTERNAL)
+	{
+		internalBuffer_deleteFrontData(cmd->content.internal);
+	}
 }
 
 /*==================[start of command queue functions]=======================*/
@@ -462,32 +456,32 @@ static int8_t waitForAny(const char ** str, uint8_t size)
 
 
 	for (i = 0; i < size; i++)
-    {
-        /* config parser */
-        parser_init(&parserLiteral[i]);
-        literalParser_setStringToMatch(&parserLiteral[i], str[i]);
+	{
+		/* config parser */
+		parser_init(&parserLiteral[i]);
+		literalParser_setStringToMatch(&parserLiteral[i], str[i]);
 
-        /* activate parser */
-        cmd_parsers_add(&parserLiteral[i]);
-    }
+		/* activate parser */
+		cmd_parsers_add(&parserLiteral[i]);
+	}
 
 
 	/* wait for the parsers OR timeout */
 	while (--timeoutMS > 0 && ret < 0)
 	{
-        for (i = 0; i < size; i++)
-        {
-            if (parser_getStatus(&parserLiteral[i]) == STATUS_COMPLETE)
-            {
-                ret = i;
-                break;
-            }
-        }
+		for (i = 0; i < size; i++)
+		{
+			if (parser_getStatus(&parserLiteral[i]) == STATUS_COMPLETE)
+			{
+				ret = i;
+				break;
+			}
+		}
 
-        if (ret < 0)
-        {
-            delayMS(1);
-        }
+		if (ret < 0)
+		{
+			timer_delay_ms(1);
+		}
 	}
 
 	cmd_parsers_clear();
@@ -524,26 +518,29 @@ void esp8266_init(void)
 {
 
 	/* parsers initialization */
-    parser_init(&parserIPD);
-    parser_init(&parserConnectionOpen);
-    parser_init(&parserConnectionClose);
-    parser_init(&parserConnectionFailed);
-    parser_init(&parserResetDetection);
+	parser_init(&parserIPD);
+	parser_init(&parserConnectionOpen);
+	parser_init(&parserConnectionClose);
+	parser_init(&parserConnectionFailed);
+	parser_init(&parserResetDetection);
 
-    /* open UART connected to RS232 connector */
+	/* open UART connected to RS232 connector */
 	fd_uart = ciaaPOSIX_open("/dev/serial/uart/2", ciaaPOSIX_O_RDWR | ciaaPOSIX_O_NONBLOCK);
 
 	/* change baud rate */
 	ciaaPOSIX_ioctl(fd_uart, ciaaPOSIX_IOCTL_SET_BAUDRATE, (void *)ciaaBAUDRATE_115200);
 
-    /* inicialización de buffer interno */
-    ciaaLibs_circBufInit(&circBuffer, internalBuffer_data, MAX_SENDBUFFER_SIZE);
+	/* inicialización de buffer interno */
+	ciaaLibs_circBufInit(&circBuffer, internalBuffer_data, MAX_SENDBUFFER_SIZE);
 
-    /* delay for WiFi module initialization */
-    delayMS(900);
+	/* initialize timer for delay */
+	timer_init();
 
-    /* set alarm for receiving task */
-	SetRelAlarm(ActivateWiFiDataReceiveTask, 10, 5);
+	/* delay for WiFi module initialization */
+	timer_delay_ms(900);
+
+	/* set alarm for receiving task */
+	SetRelAlarm(ActivateWiFiDataReceiveTask, 10, 20);
 }
 
 
@@ -575,109 +572,109 @@ int32_t esp8266_queueCommand(AT_Command command, AT_Type type, void* parameters)
 
 void esp8266_doWork(void)
 {
-    QueuedCommand cmd;
-    uint8_t haveToRetry, retry, buf[16];
-    char * waitStrings[3] = {0};
-    WaitResult result;
+	QueuedCommand cmd;
+	uint8_t haveToRetry, retry, buf[16];
+	char * waitStrings[3] = {0};
+	WaitResult result;
 
-    while(!queue_cmd_isEmpty())
-    {
-        cmd = queue_cmd_pop();
+	while(!queue_cmd_isEmpty())
+	{
+		cmd = queue_cmd_pop();
 
-        haveToRetry = 1;
-        for (retry = 1; retry <= maxRetryNumber[cmd.command] && haveToRetry; retry++)
-        {
-            logger_print_string("\r\n");
+		haveToRetry = 1;
+		for (retry = 1; retry <= maxRetryNumber[cmd.command] && haveToRetry; retry++)
+		{
+			logger_print_string("\r\n");
 
-            /* Envío: <COMANDO><TIPO><PARAMETROS>, por ejemplo AT+CIPSERVER=1,8080, donde COMANDO:AT+CIPSERVER, TIPO:= y PARAMETROS:1,8080 */
-            ciaaPOSIX_write(fd_uart, AT_Command_toString(cmd.command), ciaaPOSIX_strlen(AT_Command_toString(cmd.command)));
-            ciaaPOSIX_write(fd_uart, AT_Type_toString(cmd.type), ciaaPOSIX_strlen(AT_Type_toString(cmd.type)));
+			/* Envío: <COMANDO><TIPO><PARAMETROS>, por ejemplo AT+CIPSERVER=1,8080, donde COMANDO:AT+CIPSERVER, TIPO:= y PARAMETROS:1,8080 */
+			ciaaPOSIX_write(fd_uart, AT_Command_toString(cmd.command), ciaaPOSIX_strlen(AT_Command_toString(cmd.command)));
+			ciaaPOSIX_write(fd_uart, AT_Type_toString(cmd.type), ciaaPOSIX_strlen(AT_Type_toString(cmd.type)));
 
-            internalBuffer_sendData(cmd.paramsData);
+			internalBuffer_sendData(cmd.paramsData);
 
-            /* Terminador de comando */
-            ciaaPOSIX_write(fd_uart, "\r\n", 2);
+			/* Terminador de comando */
+			ciaaPOSIX_write(fd_uart, "\r\n", 2);
 
-            if (isCommandWaitFunctionDefined(cmd.command))
-            {
-                result = waitFunctions[cmd.command]();
-                if (result == WAIT_RESULT_BUSY || result == WAIT_RESULT_TIMEOUT)
-                {
-                    logger_print_string("Retry...");
-                    /* Hubo error al esperar (timeout, etc), por lo cual reintento si es posible */
-                    continue;
-                }
-            }
+			if (isCommandWaitFunctionDefined(cmd.command))
+			{
+				result = waitFunctions[cmd.command]();
+				if (result == WAIT_RESULT_BUSY || result == WAIT_RESULT_TIMEOUT)
+				{
+					logger_print_string("Retry...");
+					/* Hubo error al esperar (timeout, etc), por lo cual reintento si es posible */
+					continue;
+				}
+			}
 
-            /* En teoría el comando ha sido enviado correctamente.
+			/* En teoría el comando ha sido enviado correctamente.
                Borro la información de los parámetros del buffer. */
-            internalBuffer_deleteFrontData(cmd.paramsData);
+			internalBuffer_deleteFrontData(cmd.paramsData);
 
-            /* Si hay datos adicionales a enviar correspondientes al comando... */
-            if (cmd.contentInfo != CONTENT_EMPTY)
-            {
-                if (cmd.contentInfo == CONTENT_INTERNAL)
-                {
-                    internalBuffer_sendData(cmd.content.internal);
-                    internalBuffer_deleteFrontData(cmd.content.internal);
-                }
-                else /* cmd.contentInfo == CONTENT_EXTERNAL */
-                {
-                    ciaaPOSIX_write(fd_uart, cmd.content.external.buffer, cmd.content.external.length);
-                }
+			/* Si hay datos adicionales a enviar correspondientes al comando... */
+			if (cmd.contentInfo != CONTENT_EMPTY)
+			{
+				if (cmd.contentInfo == CONTENT_INTERNAL)
+				{
+					internalBuffer_sendData(cmd.content.internal);
+					internalBuffer_deleteFrontData(cmd.content.internal);
+				}
+				else /* cmd.contentInfo == CONTENT_EXTERNAL */
+						{
+					ciaaPOSIX_write(fd_uart, cmd.content.external.buffer, cmd.content.external.length);
+						}
 
-                ciaaPOSIX_strcpy((char *)uintToString((cmd.contentInfo == CONTENT_INTERNAL) ? internalBuffer_getWrittenLength(cmd.content.internal) : cmd.content.external.length,
-                                                      1,
-                                                      (unsigned char *)ciaaPOSIX_strcpy((char *)buf, "Recv ")),
-                                 " byte");
+				ciaaPOSIX_strcpy((char *)uintToString((cmd.contentInfo == CONTENT_INTERNAL) ? internalBuffer_getWrittenLength(cmd.content.internal) : cmd.content.external.length,
+						1,
+						(unsigned char *)ciaaPOSIX_strcpy((char *)buf, "Recv ")),
+						" byte");
 
-                waitStrings[0] = "ERROR"; /* If connection cannot be established, or it’s not a TCP connection , or buffer full, or some other error occurred, returns ERROR */
-                waitStrings[1] = (char*) buf; /* Recv xxxxx byte */
-                waitForAny(waitStrings, 2);
-            }
+				waitStrings[0] = "ERROR"; /* If connection cannot be established, or it’s not a TCP connection , or buffer full, or some other error occurred, returns ERROR */
+				waitStrings[1] = (char*) buf; /* Recv xxxxx byte */
+				waitForAny(waitStrings, 2);
+			}
 
-            if (callbackCommandSent != NULL)
-            {
-                callbackCommandSent(cmd.command);
-            }
+			if (callbackCommandSent != NULL)
+			{
+				callbackCommandSent(cmd.command);
+			}
 
-            /* Terminó correctamente la ejecución del comando, no reintento más */
-            haveToRetry = 0;
-            if (!isCommandWaitFunctionDefined(cmd.command))
-            {
-                /* Si el comando no tiene función de espera para confirmar la finalización de su ejecución,
-                 * se asume un delay.
-                 */
-                delayMS(200);
-            }
+			/* Terminó correctamente la ejecución del comando, no reintento más */
+			haveToRetry = 0;
+			if (!isCommandWaitFunctionDefined(cmd.command))
+			{
+				/* Si el comando no tiene función de espera para confirmar la finalización de su ejecución,
+				 * se asume un delay.
+				 */
+				timer_delay_ms(200);
+			}
 
-        }
+		}
 
-        if (haveToRetry)
-        {
-            /* Hay que reintentar, pero se acabaron los intentos... */
-            logger_print_string("Reset limit excedeed");
-            deleteCommandDataFromBuffer(&cmd);
-        }
-    }
+		if (haveToRetry)
+		{
+			/* Hay que reintentar, pero se acabaron los intentos... */
+			logger_print_string("Reset limit excedeed");
+			deleteCommandDataFromBuffer(&cmd);
+		}
+	}
 }
 
 
 void esp8266_registerCommandSentCallback(callbackCommandSentFunction_type fcn)
 {
-    callbackCommandSent = fcn;
+	callbackCommandSent = fcn;
 }
 
 
 void esp8266_registerDataReceivedCallback(callbackDataReceivedFunction_type fcn)
 {
-    callbackDataReceived = fcn;
+	callbackDataReceived = fcn;
 }
 
 
 void esp8266_registerConnectionChangedCallback(callbackConnectionChangedFunction_type fcn)
 {
-    callbackConnectionChanged = fcn;
+	callbackConnectionChanged = fcn;
 }
 
 
@@ -689,10 +686,10 @@ void esp8266_registerResetDetectedCallback(callbackResetDetectedFunction_type fc
 
 void esp8266_setReceiveBuffer(uint8_t * buf, uint16_t size)
 {
-    if (parser_getStatus(&parserIPD) != STATUS_UNINITIALIZED)
-    {
-        parser_ipd_setBuffer(&parserIPD, buf, size);
-    }
+	if (parser_getStatus(&parserIPD) != STATUS_UNINITIALIZED)
+	{
+		parser_ipd_setBuffer(&parserIPD, buf, size);
+	}
 }
 
 
@@ -710,7 +707,7 @@ ConnectionStatus esp8266_getConnectionStatus(uint8_t connectionID)
 
 TASK(WiFiDataReceiveTask)
 {
-	int8_t buf[64];
+	int8_t buf[254];
 	int8_t newChar;
 	int32_t ret;
 	uint8_t i, j;
@@ -727,11 +724,11 @@ TASK(WiFiDataReceiveTask)
 			newChar = buf[i];
 
 			if (parser_tryMatch(&parserIPD, newChar) == STATUS_COMPLETE){
-                if (callbackDataReceived != NULL)
-                {
-                	ciaaPOSIX_memcpy(&rcvData, (PARSER_RESULTS_IPD_T *) parser_getResults(&parserIPD), sizeof(ReceivedDataInfo));
-                    callbackDataReceived(rcvData);
-                }
+				if (callbackDataReceived != NULL)
+				{
+					ciaaPOSIX_memcpy(&rcvData, (PARSER_RESULTS_IPD_T *) parser_getResults(&parserIPD), sizeof(ReceivedDataInfo));
+					callbackDataReceived(rcvData);
+				}
 			}
 
 			if (!parser_ipd_isDataBeingSaved(&parserIPD))
@@ -753,38 +750,50 @@ TASK(WiFiDataReceiveTask)
 
 				if (parser_tryMatch(&parserConnectionOpen, newChar) == STATUS_COMPLETE)
 				{
-                    newInfo.connectionID = ((PARSER_RESULTS_CONNECTIONOPEN_T *)parser_getResults(&parserConnectionOpen))->connectionID;
-                    newInfo.newStatus = CONNECTION_STATUS_OPEN;
+					newInfo.connectionID = ((PARSER_RESULTS_CONNECTIONOPEN_T *)parser_getResults(&parserConnectionOpen))->connectionID;
+					newInfo.newStatus = CONNECTION_STATUS_OPEN;
 
 					connectionStatus[newInfo.connectionID] = CONNECTION_STATUS_OPEN;
 				}
 
 				if (parser_tryMatch(&parserConnectionClose, newChar) == STATUS_COMPLETE)
 				{
-                    newInfo.connectionID = ((PARSER_RESULTS_CONNECTIONCLOSE_T *)parser_getResults(&parserConnectionClose))->connectionID;
-                    newInfo.newStatus = CONNECTION_STATUS_CLOSE;
+					newInfo.connectionID = ((PARSER_RESULTS_CONNECTIONCLOSE_T *)parser_getResults(&parserConnectionClose))->connectionID;
+					newInfo.newStatus = CONNECTION_STATUS_CLOSE;
 
 					connectionStatus[newInfo.connectionID] = CONNECTION_STATUS_CLOSE;
 				}
 
 				if (parser_tryMatch(&parserConnectionFailed, newChar) == STATUS_COMPLETE)
-                {
-                    newInfo.connectionID = ((PARSER_RESULTS_CONNECTIONFAILED_T *)parser_getResults(&parserConnectionFailed))->connectionID;
-                    newInfo.newStatus = CONNECTION_STATUS_CLOSE;
+				{
+					newInfo.connectionID = ((PARSER_RESULTS_CONNECTIONFAILED_T *)parser_getResults(&parserConnectionFailed))->connectionID;
+					newInfo.newStatus = CONNECTION_STATUS_CLOSE;
 
 					connectionStatus[newInfo.connectionID] = CONNECTION_STATUS_CLOSE;
 				}
 
 				if (newInfo.connectionID < MAX_MULTIPLE_CONNECTIONS && callbackConnectionChanged != NULL)
-                {
-                    callbackConnectionChanged(newInfo);
-                }
+				{
+					callbackConnectionChanged(newInfo);
+				}
 
 				if (parser_tryMatch(&parserResetDetection, newChar) == STATUS_COMPLETE)
 				{
 					for (j = 0; j < MAX_MULTIPLE_CONNECTIONS; j++)
 					{
-						connectionStatus[j] = CONNECTION_STATUS_CLOSE;
+						if (connectionStatus[j] != CONNECTION_STATUS_CLOSE)
+						{
+							connectionStatus[j] = CONNECTION_STATUS_CLOSE;
+
+							newInfo.connectionID = j;
+							newInfo.newStatus = CONNECTION_STATUS_CLOSE;
+							if (callbackConnectionChanged != NULL)
+							{
+								callbackConnectionChanged(newInfo);
+							}
+
+						}
+
 					}
 
 					if (callbackResetDetected != NULL)

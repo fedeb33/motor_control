@@ -14,6 +14,7 @@
 #include "debug_logger.h"
 
 #if 0
+/* Código utilizado para medir tiempos de ejecución */
 volatile uint32_t * DWT_CTRL = (uint32_t *)0xE0001000;
 volatile uint32_t * DWT_CYCCNT = (uint32_t *)0xE0001004;
 
@@ -50,6 +51,7 @@ static void SendStatus(void);
 static void SendDatosCaracterizar(void);
 static void ReceiveData(ReceivedDataInfo info);
 static void WiFiReset(void);
+static void ConnectionChanged(ConnectionInfo info);
 
 static void ComenzarCaracterizar(PARSER_RESULTS_CARACTERIZAR_T * infoPtr, uint8_t connectionID);
 static void FinalizarCaracterizar(void);
@@ -80,6 +82,8 @@ static uint8_t caracterizando = 0;
 static MotorControlData controlCaracterizar;
 static uint8_t caracterizar_connectionID;
 
+static uint8_t dutycycle_connectionID = MAX_MULTIPLE_CONNECTIONS;
+
 /*==================[external data definition]===============================*/
 
 /*==================[internal functions definition]==========================*/
@@ -91,18 +95,10 @@ static void SendStatus(void)
 	unsigned char * ptr;
 	AT_CIPSEND_DATA cipsend_data;
 
-	cipsend_data.connectionID = MAX_MULTIPLE_CONNECTIONS;
 
-	for (i = 0; i < MAX_MULTIPLE_CONNECTIONS; i++){
-		if (esp8266_getConnectionStatus(i) == CONNECTION_STATUS_OPEN){
-			cipsend_data.connectionID = i;
-			break;
-		}
-	}
-
-
-	if (cipsend_data.connectionID < MAX_MULTIPLE_CONNECTIONS){
-
+	if (dutycycle_connectionID < MAX_MULTIPLE_CONNECTIONS && esp8266_getConnectionStatus(dutycycle_connectionID) == CONNECTION_STATUS_OPEN)
+	{
+		cipsend_data.connectionID = dutycycle_connectionID;
 		cipsend_data.content = (char *)encoder_data;
 		cipsend_data.copyContentToBuffer = AT_CIPSEND_CONTENT_COPYTOBUFFER;
 
@@ -142,6 +138,8 @@ static void ComenzarCaracterizar(PARSER_RESULTS_CARACTERIZAR_T * infoPtr, uint8_
 
 		encoder_beginCount(infoPtr->tiempo);
 		encoder_setTimeElapsedCallback(SendDatosCaracterizar);
+
+		dutycycle_connectionID = MAX_MULTIPLE_CONNECTIONS;
 	}
 	else
 	{
@@ -248,8 +246,14 @@ static void ReceiveData(ReceivedDataInfo info)
 		{
 			if (parser_tryMatch(&parserDutyCycle, receiveBuffer[i]) == STATUS_COMPLETE)
 			{
+
+				if (dutycycle_connectionID >= MAX_MULTIPLE_CONNECTIONS)
+				{
+					dutycycle_connectionID = info.connectionID;
+				}
+
 				dutyCycleResults = parser_getResults(&parserDutyCycle);
-				if (dutyCycleResults->motorID < MOTOR_COUNT)
+				if (dutycycle_connectionID == info.connectionID && dutyCycleResults->motorID < MOTOR_COUNT)
 				{
 					lastDutyCycle[dutyCycleResults->motorID] = *dutyCycleResults;
 				}
@@ -290,16 +294,27 @@ static void WiFiReset(void)
 	esp8266_queueCommand(AT_CIPMUX, AT_TYPE_SET, (void*)AT_CIPMUX_MULTIPLE_CONNECTION);
 	esp8266_queueCommand(AT_CIPSERVER, AT_TYPE_SET, &cipserver_data);
 
-	/* Se apagan los motores ante un reset inesperado del módulo WiFi */
+	/* Se apagan los motores ante un reset del módulo WiFi */
 	for (i = 0; i < MOTOR_COUNT; i++){
 		lastDutyCycle[i].motorID = i;
 		lastDutyCycle[i].dutyCycle = 0;
 		ciaaPWM_updateMotor(lastDutyCycle[i]);
 	}
 
+	/* Si se estaba caracterizando un motor, se cancela la operación */
 	if (caracterizando)
 	{
 		FinalizarCaracterizar();
+	}
+
+}
+
+
+static void ConnectionChanged(ConnectionInfo info)
+{
+	if (info.connectionID == dutycycle_connectionID && info.newStatus == CONNECTION_STATUS_CLOSE)
+	{
+		dutycycle_connectionID = MAX_MULTIPLE_CONNECTIONS;
 	}
 }
 
@@ -389,10 +404,6 @@ TASK(InitTask)
 	parser_init(&parserCancelarCaracterizar);
 	literalParser_setStringToMatch(&parserCancelarCaracterizar, "$CANCELAR_CARACTERIZAR$");
 
-	encoder_init();
-	encoder_setTimeElapsedCallback(SendStatus);
-	encoder_beginCount(1000);
-
 	/* Configuracion de los GPIO de salida. */
 	/* Habilitacion de los enable, /reset y chip_enable del puente H. */
 	gpio_buffer |= (ENABLE12|ENABLE34|ESP8266_EN|ESP8266_RST);
@@ -402,7 +413,13 @@ TASK(InitTask)
 	esp8266_setReceiveBuffer(receiveBuffer, RECEIVE_BUFFER_LENGTH);
 	esp8266_registerDataReceivedCallback(ReceiveData);
 	esp8266_registerResetDetectedCallback(WiFiReset);
+	esp8266_registerConnectionChangedCallback(ConnectionChanged);
+
 	esp8266_queueCommand(AT_RST, AT_TYPE_EXECUTE, 0);
+
+	encoder_init();
+	encoder_setTimeElapsedCallback(SendStatus);
+	encoder_beginCount(1000);
 
 	logger_init();
 

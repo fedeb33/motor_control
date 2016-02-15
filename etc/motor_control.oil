@@ -172,4 +172,10 @@ ISR GPIO1_IRQHandler {
    PRIORITY = 0;
 };
 
+ISR RIT_IRQHandler {
+   INTERRUPT = RIT;
+   CATEGORY = 1;
+   PRIORITY = 0;
+};
+
 };
