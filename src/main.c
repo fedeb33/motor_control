@@ -88,6 +88,18 @@ static uint8_t dutycycle_connectionID = MAX_MULTIPLE_CONNECTIONS;
 
 /*==================[internal functions definition]==========================*/
 
+static void apagarMotores(void)
+{
+	uint8_t i;
+
+	/* Se apagan los motores ante un reset del módulo WiFi */
+	for (i = 0; i < MOTOR_COUNT; i++){
+		lastDutyCycle[i].motorID = i;
+		lastDutyCycle[i].dutyCycle = 0;
+		ciaaPWM_updateMotor(lastDutyCycle[i]);
+	}
+}
+
 static void SendStatus(void)
 {
 	uint8_t encoder_data[] = "$SPEEDXTVALOR$";
@@ -158,6 +170,8 @@ static void FinalizarCaracterizar(void)
 	caracterizando = 0;
 	encoder_beginCount(1000);
 	encoder_setTimeElapsedCallback(SendStatus);
+
+	apagarMotores();
 }
 
 
@@ -294,13 +308,6 @@ static void WiFiReset(void)
 	esp8266_queueCommand(AT_CIPMUX, AT_TYPE_SET, (void*)AT_CIPMUX_MULTIPLE_CONNECTION);
 	esp8266_queueCommand(AT_CIPSERVER, AT_TYPE_SET, &cipserver_data);
 
-	/* Se apagan los motores ante un reset del módulo WiFi */
-	for (i = 0; i < MOTOR_COUNT; i++){
-		lastDutyCycle[i].motorID = i;
-		lastDutyCycle[i].dutyCycle = 0;
-		ciaaPWM_updateMotor(lastDutyCycle[i]);
-	}
-
 	/* Si se estaba caracterizando un motor, se cancela la operación */
 	if (caracterizando)
 	{
@@ -315,6 +322,12 @@ static void ConnectionChanged(ConnectionInfo info)
 	if (info.connectionID == dutycycle_connectionID && info.newStatus == CONNECTION_STATUS_CLOSE)
 	{
 		dutycycle_connectionID = MAX_MULTIPLE_CONNECTIONS;
+		apagarMotores();
+	}
+
+	if (caracterizando && caracterizar_connectionID == info.connectionID && info.newStatus == CONNECTION_STATUS_CLOSE)
+	{
+		FinalizarCaracterizar();
 	}
 }
 
